@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="JobRunner.Api/JobRunner.Api.csproj" />
   <Project Path="JobRunner.Infrastructure/JobRunner.Infrastructure.csproj" />
+  <Project Path="JobRunner.Worker/JobRunner.Worker.csproj" />
 </Solution>
