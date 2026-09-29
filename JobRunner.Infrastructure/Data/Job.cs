@@ -8,7 +8,6 @@ public class Job
 
     public JobStatus Status { get; set; }
     public int Attempts { set; get; }
-    public DateTime? NextRetryAt { get; set; }
     public string? LastError { get; set; }
     public DateTime RunAt { get; set; }
     public DateTime CreatedAt { get; set; }

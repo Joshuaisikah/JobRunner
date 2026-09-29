@@ -54,9 +54,6 @@ namespace JobRunner.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<DateTime?>("NextRetryAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -70,6 +67,10 @@ namespace JobRunner.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RunAt", "Id")
+                        .HasDatabaseName("IX_jobs_claim")
+                        .HasFilter("\"Status\" = 'Pending'");
 
                     b.ToTable("jobs", (string)null);
                 });
