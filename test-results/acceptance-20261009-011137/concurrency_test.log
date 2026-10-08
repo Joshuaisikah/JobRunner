@@ -1,0 +1,26 @@
+[01:11:37] === 0. Preconditions ===
+[01:11:37] Building (once, so all workers run the same binary)
+[01:11:38] Starting API
+[01:11:40] === 1. Resetting jobs table ===
+[01:11:40] === 2. Seeding 200 jobs via API ===
+[01:11:42] === 3. Launching 3 workers ===
+[01:11:42] Worker PIDs: 178900 178901 178902
+[01:11:42] === 4. Waiting for the queue to drain (max 180s) ===
+[01:11:42] remaining: 200 (0s)
+[01:11:44] remaining: 198 (2s)
+[01:11:46] remaining: 194 (4s)
+[01:11:48] remaining: 185 (6s)
+[01:11:50] remaining: 179 (8s)
+[01:11:52] remaining: 173 (10s)
+[01:11:54] remaining: 167 (12s)
+[01:11:56] remaining: 161 (14s)
+[01:11:58] remaining: 155 (16s)
+[01:12:00] remaining: 149 (18s)
+[01:12:03] remaining: 143 (21s)
+[01:12:05] remaining: 137 (23s)
+[01:12:07] remaining: 131 (25s)
+[01:12:09] remaining: 125 (27s)
+[01:12:11] remaining: 119 (29s)
+[01:12:13] remaining: 113 (31s)
+[01:12:15] remaining: 107 (33s)
+[01:12:17] remaining: 101 (35s)

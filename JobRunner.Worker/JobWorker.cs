@@ -95,10 +95,6 @@ public class JobWorker : BackgroundService
                 {
                     workFound = true;
 
-                    // Register the whole batch BEFORE any processing starts
-                    foreach (var job in claimedJobs)
-                        _heldJobs[job.Id] = (job.FenceToken, new CancellationTokenSource());
-
                     foreach (var job in claimedJobs)
                     {
                         _logger.LogInformation(
@@ -106,9 +102,9 @@ public class JobWorker : BackgroundService
                             job.Id,
                             job.JobType
                         );
-
-                        await ProcessJobAsync(job, stoppingToken);
                     }
+
+                    await ProcessBatchAsync(claimedJobs, stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
