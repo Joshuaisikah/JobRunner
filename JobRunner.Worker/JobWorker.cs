@@ -69,35 +69,18 @@ public class JobWorker : BackgroundService
                     {
                         workFound = true;
 
-                        // Register the whole batch BEFORE any processing starts
                         foreach (var job in reclaimedJobs)
-                            _heldJobs[job.Id] = (job.FenceToken, new CancellationTokenSource());
-
-                        try
                         {
-                            foreach (var job in reclaimedJobs)
-                            {
-                                _logger.LogWarning(
-                                    "Reclaimed stale job {JobId} of type {JobType} (Attempt {Attempt}/{Max})",
-                                    job.Id,
-                                    job.JobType,
-                                    job.Attempts,
-                                    job.MaxAttempts
-                                );
+                            _logger.LogWarning(
+                                "Reclaimed stale job {JobId} of type {JobType} (Attempt {Attempt}/{Max})",
+                                job.Id,
+                                job.JobType,
+                                job.Attempts,
+                                job.MaxAttempts
+                            );
+                        }
 
-                                await ProcessJobAsync(job, stoppingToken);
-                            }
-                        }
-                        finally
-                        {
-                            // Drop any jobs that never started or were abandoned mid-batch
-                            // so the heartbeat stops renewing them and they can go stale.
-                            foreach (var job in reclaimedJobs)
-                            {
-                                if (_heldJobs.TryRemove(job.Id, out var entry))
-                                    entry.Cts.Dispose();
-                            }
-                        }
+                        await ProcessBatchAsync(reclaimedJobs, stoppingToken);
                     }
 
                     lastReclaimTime = DateTime.UtcNow;
@@ -146,7 +129,7 @@ public class JobWorker : BackgroundService
 
     private async Task ProcessJobAsync(ClaimedJob job, CancellationToken stoppingToken)
     {
-        using var jobScope = _scopeFactory.CreateScope();
+        var jobScope = _scopeFactory.CreateScope();
         var jobStore = jobScope.ServiceProvider.GetRequiredService<JobStore>();
         var handlers = jobScope.ServiceProvider.GetRequiredService<IEnumerable<IJobHandler>>();
         var handler = handlers.FirstOrDefault(h => h.JobType == job.JobType);
@@ -297,6 +280,32 @@ public class JobWorker : BackgroundService
                     _lifetime.StopApplication(); // process exits cleanly
                     return;
                 }
+            }
+        }
+    }
+
+    private async Task ProcessBatchAsync(
+        IReadOnlyList<ClaimedJob> jobs,
+        CancellationToken stoppingToken
+    )
+    {
+        if (jobs.Count == 0)
+            return;
+
+        foreach (var job in jobs)
+            _heldJobs[job.Id] = (job.FenceToken, new CancellationTokenSource());
+
+        try
+        {
+            foreach (var job in jobs)
+                await ProcessJobAsync(job, stoppingToken);
+        }
+        finally
+        {
+            foreach (var job in jobs)
+            {
+                if (_heldJobs.TryRemove(job.Id, out var entry))
+                    entry.Cts.Dispose();
             }
         }
     }

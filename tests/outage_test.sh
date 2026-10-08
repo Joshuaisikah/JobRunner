@@ -69,4 +69,4 @@ echo "        main-loop errors during outage: $(cat "$LOG_DIR"/w*.log | grep -c 
      "heartbeat misses: $(cat "$LOG_DIR"/w*.log | grep -c 'Heartbeat failed' || true)," \
      "reclaims: $(cat "$LOG_DIR"/w*.log | grep -c 'Reclaimed stale job' || true)"
 
-finish "(all $JOBS jobs terminal ${recovered_in}s after a ${OUTAGE}s outage)"
+finish "(${OUTAGE}s outage; watched ${recovered_in}s after the DB came back)"

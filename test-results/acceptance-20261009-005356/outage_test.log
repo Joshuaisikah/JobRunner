@@ -1,3 +1,29 @@
 [00:57:43] === Preconditions ===
 [00:57:44] === 1. Seed 20 jobs; start 2 workers ===
 [00:57:46] === 2. Database outage: 4s ===
+[00:57:51] Database back
+[00:57:51] === 3. Every job must be terminal within 80s ===
+[00:59:12] Deadline passed with 16 job(s) still open:
+  job 3 Running attempts=1 ClaimedAt 7s ago
+  job 4 Running attempts=1 ClaimedAt 7s ago
+  job 5 Running attempts=1 ClaimedAt 7s ago
+  job 6 Running attempts=1 ClaimedAt 7s ago
+  job 7 Running attempts=1 ClaimedAt 7s ago
+  job 8 Running attempts=1 ClaimedAt 7s ago
+  job 9 Running attempts=1 ClaimedAt 7s ago
+  job 10 Running attempts=1 ClaimedAt 7s ago
+  job 13 Running attempts=1 ClaimedAt 7s ago
+  job 14 Running attempts=1 ClaimedAt 7s ago
+  job 15 Running attempts=1 ClaimedAt 7s ago
+  job 16 Running attempts=1 ClaimedAt 7s ago
+  job 17 Running attempts=1 ClaimedAt 7s ago
+  job 18 Running attempts=1 ClaimedAt 7s ago
+  job 19 Running attempts=1 ClaimedAt 7s ago
+  job 20 Running attempts=1 ClaimedAt 7s ago
+[00:59:12] === 4. Assertions ===
+  FAIL  jobs still Pending/Running                           got 16, expected 0
+  FAIL  jobs Succeeded                                       got 4, expected 20
+        main-loop errors during outage: 10, heartbeat misses: 0, reclaims: 2
+
+[00:59:12] RESULT: FAIL  (2 assertion(s) failed) (all 20 jobs terminal 81s after a 4s outage)
+[00:59:12] Logs kept in /tmp/jobrunner-outage_test-VSx78j
