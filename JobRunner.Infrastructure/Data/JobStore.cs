@@ -35,6 +35,34 @@ public class JobStore(JobRunnerDbContext db)
             .ToListAsync(ct);
     }
 
+    public async Task<List<ClaimedJob>> ReclaimStaleAsync(
+        string workerId,
+        TimeSpan staleAfter,
+        int batch,
+        CancellationToken ct
+    )
+    {
+        var now = DateTime.UtcNow;
+        var staleThreshold = now - staleAfter;
+        return await db
+            .Database.SqlQuery<ClaimedJob>(
+                $"""
+                UPDATE jobs
+                SET "Status" = 'Running', "LockedBy" = {workerId}, "ClaimedAt" = {now},
+                    "FenceToken" = "FenceToken" + 1, "Attempts" = "Attempts" + 1
+                WHERE "Id" IN (
+                    SELECT "Id" FROM jobs
+                    WHERE "Status" = 'Running' AND "ClaimedAt" <= {staleThreshold}
+                    ORDER BY "ClaimedAt", "Id"
+                    LIMIT {batch}
+                    FOR UPDATE SKIP LOCKED)
+                RETURNING "Id", "JobType", "Payload"::text AS "Payload",
+                          "FenceToken", "Attempts", "MaxAttempts"
+                """
+            )
+            .ToListAsync(ct);
+    }
+
     // true = my write landed, false = I lost the claim (zero rows matched)
     public async Task<bool> CompleteAsync(long id, int token, CancellationToken ct)
     {

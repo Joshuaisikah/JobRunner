@@ -14,9 +14,14 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(j => j.Payload).IsRequired().HasColumnType("jsonb");
         builder.Property(j => j.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(j => j.LockedBy).HasMaxLength(100);
+        builder.Property(j => j.MaxAttempts).HasDefaultValue(5);
         builder
             .HasIndex(j => new { j.RunAt, j.Id })
             .HasFilter("\"Status\" = 'Pending'")
             .HasDatabaseName("IX_jobs_claim");
+        builder
+            .HasIndex(j => new { j.ClaimedAt, j.Id })
+            .HasFilter("\"Status\" = 'Running'")
+            .HasDatabaseName("IX_jobs_stale");
     }
 }

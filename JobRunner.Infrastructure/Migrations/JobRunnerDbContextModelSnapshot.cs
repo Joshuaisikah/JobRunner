@@ -54,6 +54,11 @@ namespace JobRunner.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int>("MaxAttempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5);
+
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -67,6 +72,10 @@ namespace JobRunner.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClaimedAt", "Id")
+                        .HasDatabaseName("IX_jobs_stale")
+                        .HasFilter("\"Status\" = 'Running'");
 
                     b.HasIndex("RunAt", "Id")
                         .HasDatabaseName("IX_jobs_claim")

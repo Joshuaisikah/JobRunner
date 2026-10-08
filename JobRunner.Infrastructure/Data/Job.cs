@@ -14,4 +14,5 @@ public class Job
     public string? LockedBy { get; set; }
     public DateTime? ClaimedAt { get; set; }
     public int FenceToken { get; set; }
+    public int MaxAttempts { get; set; }
 }
