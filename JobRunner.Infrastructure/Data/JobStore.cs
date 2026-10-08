@@ -117,4 +117,25 @@ public class JobStore(JobRunnerDbContext db)
         );
         return rows == 1;
     }
+
+    // BeatDeadline < HeartbeatInterval <= StaleTimeout / 3
+    public async Task<List<long>> HeartbeatAsync(long[] ids, int[] tokens, CancellationToken ct)
+    {
+        if (ids.Length == 0)
+            return [];
+
+        return await db
+            .Database.SqlQuery<long>(
+                $"""
+                UPDATE jobs AS j
+                SET "ClaimedAt" = {DateTime.UtcNow}
+                FROM unnest({ids}, {tokens}) AS t(id, token)
+                WHERE j."Id" = t.id
+                  AND j."FenceToken" = t.token
+                  AND j."Status" = 'Running'
+                RETURNING j."Id" AS "Value"
+                """
+            )
+            .ToListAsync(ct);
+    }
 }

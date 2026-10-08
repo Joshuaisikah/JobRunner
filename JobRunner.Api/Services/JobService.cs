@@ -1,3 +1,4 @@
+using System.Text.Json;
 using JobRunner.Api.DTOs;
 using JobRunner.Infrastructure;
 using JobRunner.Infrastructure.Data;
@@ -7,6 +8,8 @@ namespace JobRunner.Api.Services;
 
 public class JobService
 {
+    private const int DefaultMaxAttempts = 5;
+
     private readonly JobRunnerDbContext _dbContext;
 
     public JobService(JobRunnerDbContext dbContext)
@@ -22,13 +25,37 @@ public class JobService
         if (!JobType.All.Contains(jobRequest.JobType))
             return Result<JobResponseDto>.Failure(JobError.UnknownJobType);
 
+        // Reject missing / non-object payloads early (poison message → 400)
+        if (jobRequest.Payload.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array))
+            return Result<JobResponseDto>.Failure(JobError.InvalidPayload);
+
+        // Force UTC – reject non-UTC values
+        DateTime runAt;
+        if (jobRequest.RunAt is null)
+        {
+            runAt = DateTime.UtcNow;
+        }
+        else if (jobRequest.RunAt.Value.Kind != DateTimeKind.Utc)
+        {
+            return Result<JobResponseDto>.Failure(JobError.InvalidRunAt);
+        }
+        else
+        {
+            runAt = jobRequest.RunAt.Value;
+        }
+
+        var maxAttempts = jobRequest.MaxAttempts ?? DefaultMaxAttempts;
+
         var job = new Job
         {
             JobType = jobRequest.JobType,
             Payload = jobRequest.Payload.GetRawText(),
             Status = JobStatus.Pending,
             CreatedAt = DateTime.UtcNow,
-            RunAt = jobRequest.RunAt ?? DateTime.UtcNow,
+            RunAt = runAt,
+            MaxAttempts = maxAttempts, // ← persist per-job value
+            Attempts = 0,
+            FenceToken = 0,
         };
 
         await _dbContext.Jobs.AddAsync(job, ct);
@@ -55,7 +82,6 @@ public class JobService
             pageSize = maxPageSize;
 
         var query = _dbContext.Jobs.AsNoTracking();
-
         if (status is not null)
             query = query.Where(j => j.Status == status.Value);
 
@@ -63,9 +89,10 @@ public class JobService
 
         var jobs = await query
             .OrderByDescending(j => j.CreatedAt)
+            .ThenByDescending(j => j.Id) // ← stable tie-breaker
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync(ct); // materialize Job entities first
+            .ToListAsync(ct);
 
         var items = jobs.Select(j => new JobResponseDto(
                 j.Id,
@@ -73,7 +100,7 @@ public class JobService
                 j.CreatedAt,
                 j.RunAt
             ))
-            .ToList(); // map to DTOs in memory, after the DB query ran
+            .ToList();
 
         return new PagedResultDto<JobResponseDto>(items, totalCount, page, pageSize);
     }
@@ -81,10 +108,13 @@ public class JobService
     public async Task<Result<JobResponseDto>> GetJobByIdAsync(long jobId, CancellationToken ct)
     {
         var job = await _dbContext.Jobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId, ct);
+
         if (job is null)
             return Result<JobResponseDto>.Failure(JobError.NotFound);
-        var jobDto = new JobResponseDto(job.Id, job.Status.ToString(), job.CreatedAt, job.RunAt);
-        return Result<JobResponseDto>.Success(jobDto);
+
+        return Result<JobResponseDto>.Success(
+            new JobResponseDto(job.Id, job.Status.ToString(), job.CreatedAt, job.RunAt)
+        );
     }
 }
 

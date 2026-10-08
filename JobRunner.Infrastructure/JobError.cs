@@ -4,4 +4,6 @@ public enum JobError
 {
     UnknownJobType,
     NotFound,
+    InvalidPayload,
+    InvalidRunAt,
 }

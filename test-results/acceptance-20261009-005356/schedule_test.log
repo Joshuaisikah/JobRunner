@@ -1,0 +1,4 @@
+[00:56:35] === Preconditions ===
+[00:56:38] === 1. Seed one job with runAt = now + 60s ===
+[00:56:38] runAt = 2026-10-08T21:57:38Z
+[00:56:38] === 2. Start 3 workers (more chances to claim early) ===

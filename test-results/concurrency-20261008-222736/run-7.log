@@ -1,0 +1,61 @@
+[22:35:44] === 0. Preconditions ===
+[22:35:45] Building (once, so all workers run the same binary)
+[22:35:46] Starting API
+[22:35:48] === 1. Resetting jobs table ===
+[22:35:49] === 2. Seeding 200 jobs via API ===
+[22:35:52] === 3. Launching 3 workers ===
+[22:35:52] Worker PIDs: 99269 99270 99271
+[22:35:52] === 4. Waiting for the queue to drain (max 180s) ===
+[22:35:52] remaining: 200 (0s)
+[22:35:54] remaining: 200 (2s)
+[22:35:56] remaining: 194 (4s)
+[22:35:58] remaining: 188 (6s)
+[22:36:00] remaining: 182 (8s)
+[22:36:02] remaining: 173 (10s)
+[22:36:05] remaining: 167 (13s)
+[22:36:07] remaining: 161 (15s)
+[22:36:09] remaining: 155 (17s)
+[22:36:11] remaining: 149 (19s)
+[22:36:13] remaining: 143 (21s)
+[22:36:15] remaining: 137 (23s)
+[22:36:17] remaining: 131 (25s)
+[22:36:19] remaining: 125 (27s)
+[22:36:21] remaining: 119 (29s)
+[22:36:23] remaining: 113 (31s)
+[22:36:26] remaining: 107 (34s)
+[22:36:28] remaining: 101 (36s)
+[22:36:30] remaining: 92 (38s)
+[22:36:32] remaining: 86 (40s)
+[22:36:34] remaining: 80 (42s)
+[22:36:36] remaining: 74 (44s)
+[22:36:38] remaining: 68 (46s)
+[22:36:40] remaining: 62 (48s)
+[22:36:42] remaining: 56 (50s)
+[22:36:45] remaining: 50 (53s)
+[22:36:47] remaining: 44 (55s)
+[22:36:49] remaining: 38 (57s)
+[22:36:51] remaining: 32 (59s)
+[22:36:53] remaining: 26 (61s)
+[22:36:55] remaining: 18 (63s)
+[22:36:57] remaining: 14 (65s)
+[22:36:59] remaining: 10 (67s)
+[22:37:01] remaining: 6 (69s)
+[22:37:03] remaining: 2 (71s)
+[22:37:06] Queue drained in 74s
+[22:37:06] === 5. Stopping workers ===
+[22:37:06] === 6. Assertions ===
+  PASS  jobs in table                                  200
+  PASS  jobs Succeeded                                 200
+  PASS  jobs claimed more than once                    0
+  PASS  jobs with FenceToken <> 1                      0
+  PASS  handler executions (log lines)                 200
+  PASS  jobs executed more than once                   0
+  PASS  jobs never executed                            0
+  PASS  workers that executed nothing                  0
+        distribution: w1=70 w2=70 w3=60 
+  PASS  stale reclaims                                 0
+  PASS  lost fence tokens                              0
+  PASS  handler failures                               0
+  PASS  worker main-loop errors                        0
+
+[22:37:06] RESULT: PASS  (3 workers, 200 jobs, drained in 74s, w1=70 w2=70 w3=60 )
