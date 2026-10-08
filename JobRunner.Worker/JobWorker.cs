@@ -1,5 +1,5 @@
 using JobRunner.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
+using JobRunner.Worker.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,6 +10,7 @@ public class JobWorker : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ReclaimInterval = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan StaleTimeout = TimeSpan.FromSeconds(30);
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JobWorker> _logger;
@@ -23,124 +24,142 @@ public class JobWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Worker {WorkerId} starting", _workerId);
+        _logger.LogInformation("JobWorker started with WorkerId: {WorkerId}", _workerId);
+        var lastReclaimTime = DateTime.UtcNow;
 
-        var claimLoop = RunClaimLoopAsync(stoppingToken);
-        var reclaimLoop = RunReclaimLoopAsync(stoppingToken);
-
-        await Task.WhenAll(claimLoop, reclaimLoop);
-
-        _logger.LogInformation("Worker {WorkerId} stopped", _workerId);
-    }
-
-    private async Task RunClaimLoopAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
-            List<ClaimedJob> claimed;
+            bool workFound = false;
 
-            // Scope #1: claim a batch. Short-lived.
-            using (var scope = _scopeFactory.CreateScope())
-            {
-                var store = scope.ServiceProvider.GetRequiredService<JobStore>();
-                claimed = await store.ClaimAsync(_workerId, batchSize: 10, ct);
-            }
-
-            if (claimed.Count == 0)
-            {
-                // Only sleep when idle. If we got jobs, loop straight back.
-                var jitter = Random.Shared.Next(0, 250);
-                try
-                {
-                    await Task.Delay(PollInterval + TimeSpan.FromMilliseconds(jitter), ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                continue;
-            }
-
-            foreach (var job in claimed)
-            {
-                if (ct.IsCancellationRequested)
-                    break;
-                await ProcessJobAsync(job, ct);
-            }
-        }
-    }
-
-    private async Task RunReclaimLoopAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
-        {
             try
             {
-                await Task.Delay(ReclaimInterval, ct);
+                // 1. Reclaim stale jobs periodically
+                if (DateTime.UtcNow - lastReclaimTime >= ReclaimInterval)
+                {
+                    using var reclaimScope = _scopeFactory.CreateScope();
+                    var jobStore = reclaimScope.ServiceProvider.GetRequiredService<JobStore>();
+
+                    var reclaimedJobs = await jobStore.ReclaimStaleAsync(
+                        _workerId,
+                        StaleTimeout,
+                        batch: 10,
+                        stoppingToken
+                    );
+                    if (reclaimedJobs.Count > 0)
+                    {
+                        workFound = true;
+                        foreach (var job in reclaimedJobs)
+                        {
+                            _logger.LogWarning(
+                                "Reclaimed stale job {JobId} of type {JobType} (Attempt {Attempt}/{Max})",
+                                job.Id,
+                                job.JobType,
+                                job.Attempts,
+                                job.MaxAttempts
+                            );
+
+                            await ProcessJobAsync(job, stoppingToken);
+                        }
+                    }
+                    lastReclaimTime = DateTime.UtcNow;
+                }
+
+                // 2. Claim new pending jobs
+                using var claimScope = _scopeFactory.CreateScope();
+                var store = claimScope.ServiceProvider.GetRequiredService<JobStore>();
+
+                var claimedJobs = await store.ClaimAsync(_workerId, batch: 10, stoppingToken);
+                if (claimedJobs.Count > 0)
+                {
+                    workFound = true;
+                    foreach (var job in claimedJobs)
+                    {
+                        _logger.LogInformation(
+                            "Claimed job {JobId} of type {JobType}",
+                            job.Id,
+                            job.JobType
+                        );
+                        await ProcessJobAsync(job, stoppingToken);
+                    }
+                }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
+                // Graceful shutdown requested; suppress main loop cancellation errors
                 break;
             }
-
-            List<ClaimedJob> reclaimed;
-
-            // Scope for reclaim: claim-and-return, then hand off.
-            using (var scope = _scopeFactory.CreateScope())
+            catch (Exception ex)
             {
-                var store = scope.ServiceProvider.GetRequiredService<JobStore>();
-                reclaimed = await store.ReclaimStaleAsync(_workerId, ct);
+                _logger.LogError(ex, "Error occurred in worker main loop");
             }
 
-            if (reclaimed.Count == 0)
-                continue;
-
-            _logger.LogInformation("Reclaimed {Count} stale jobs", reclaimed.Count);
-
-            // Hand them to the same execution path. Scope per job.
-            foreach (var job in reclaimed)
+            // Only sleep if neither claim nor reclaim found any work
+            if (!workFound && !stoppingToken.IsCancellationRequested)
             {
-                if (ct.IsCancellationRequested)
-                    break;
-                await ProcessJobAsync(job, ct);
+                await Task.Delay(PollInterval, stoppingToken);
             }
         }
+
+        _logger.LogInformation("JobWorker stopped gracefully.");
     }
 
-    private async Task ProcessJobAsync(ClaimedJob job, CancellationToken ct)
+    private async Task ProcessJobAsync(ClaimedJob job, CancellationToken stoppingToken)
     {
-        // Fresh scope per job: isolation. One bad job can't poison its neighbours.
-        using var scope = _scopeFactory.CreateScope();
-        var store = scope.ServiceProvider.GetRequiredService<JobStore>();
+        // Fresh scope per individual job execution
+        using var jobScope = _scopeFactory.CreateScope();
+        var jobStore = jobScope.ServiceProvider.GetRequiredService<JobStore>();
+        var handlers = jobScope.ServiceProvider.GetRequiredService<IEnumerable<IJobHandler>>();
 
-        _logger.LogInformation(
-            "Processing job {JobId} (fence {FenceToken}, attempt {Attempt})",
-            job.Id,
-            job.FenceToken,
-            job.AttemptCount
-        );
+        var handler = handlers.FirstOrDefault(h => h.JobType == job.JobType);
+
+        if (handler == null)
+        {
+            var errorMsg = $"No registered handler found for job type '{job.JobType}'";
+            _logger.LogError("{Error}", errorMsg);
+
+            if (!stoppingToken.IsCancellationRequested)
+            {
+                await jobStore.FailAsync(job, errorMsg, permanent: true, stoppingToken);
+            }
+            return;
+        }
 
         try
         {
-            // TODO: dispatch on job.JobType to a handler.
-            // For now, just simulate work and mark success.
-            await Task.Delay(50, ct);
+            _logger.LogInformation(
+                "Executing job {JobId} using handler {HandlerType}",
+                job.Id,
+                handler.GetType().Name
+            );
 
-            await store.MarkSucceededAsync(job.Id, job.FenceToken, ct);
+            await handler.ExecuteAsync(job, stoppingToken);
 
-            _logger.LogInformation("Job {JobId} succeeded", job.Id);
+            if (!stoppingToken.IsCancellationRequested)
+            {
+                var success = await jobStore.CompleteAsync(job.Id, job.FenceToken, stoppingToken);
+                if (success)
+                {
+                    _logger.LogInformation("Successfully completed job {JobId}", job.Id);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Lost fence token ownership for job {JobId} upon completion attempt",
+                        job.Id
+                    );
+                }
+            }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (Exception ex) when (stoppingToken.IsCancellationRequested)
         {
-            // Shutdown requested mid-job. Don't mark success or failure —
-            // let the stale reclaim pick it up on the next process.
-            _logger.LogWarning("Job {JobId} interrupted by shutdown", job.Id);
-            throw;
+            _logger.LogWarning("Job {JobId} execution interrupted due to worker shutdown.", job.Id);
+            // Leave the job locked/running or let stale reclaim handle it cleanly upon restart
+            // without crashing on a cancelled DB context token.
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Job {JobId} failed", job.Id);
-            await store.MarkFailedAsync(job.Id, job.FenceToken, ex.Message, ct);
+            _logger.LogError(ex, "Execution failed for job {JobId}", job.Id);
+            await jobStore.FailAsync(job, ex.ToString(), permanent: false, stoppingToken);
         }
     }
 }

@@ -2,4 +2,4 @@ using System.Text.Json;
 
 namespace JobRunner.Api.DTOs;
 
-public record JobRequestDto(string JobType, JsonElement Payload);
+public record JobRequestDto(string JobType, JsonElement Payload, DateTime? RunAt = null);

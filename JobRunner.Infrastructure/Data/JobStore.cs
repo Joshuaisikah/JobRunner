@@ -44,6 +44,23 @@ public class JobStore(JobRunnerDbContext db)
     {
         var now = DateTime.UtcNow;
         var staleThreshold = now - staleAfter;
+
+        // 1. Permanently fail any stale jobs that have exhausted their max attempts
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            UPDATE jobs
+            SET "Status" = 'Failed', 
+                "LastError" = 'Max attempts exceeded due to stale worker timeout.',
+                "LockedBy" = NULL,
+                "ClaimedAt" = NULL
+            WHERE "Status" = 'Running' 
+              AND "ClaimedAt" <= {staleThreshold} 
+              AND "Attempts" >= "MaxAttempts"
+            """,
+            ct
+        );
+
+        // 2. Reclaim stale jobs that still have remaining attempts left
         return await db
             .Database.SqlQuery<ClaimedJob>(
                 $"""
@@ -52,7 +69,9 @@ public class JobStore(JobRunnerDbContext db)
                     "FenceToken" = "FenceToken" + 1, "Attempts" = "Attempts" + 1
                 WHERE "Id" IN (
                     SELECT "Id" FROM jobs
-                    WHERE "Status" = 'Running' AND "ClaimedAt" <= {staleThreshold}
+                    WHERE "Status" = 'Running' 
+                      AND "ClaimedAt" <= {staleThreshold} 
+                      AND "Attempts" < "MaxAttempts"
                     ORDER BY "ClaimedAt", "Id"
                     LIMIT {batch}
                     FOR UPDATE SKIP LOCKED)

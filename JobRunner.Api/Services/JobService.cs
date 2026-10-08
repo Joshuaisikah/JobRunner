@@ -28,7 +28,7 @@ public class JobService
             Payload = jobRequest.Payload.GetRawText(),
             Status = JobStatus.Pending,
             CreatedAt = DateTime.UtcNow,
-            RunAt = DateTime.UtcNow,
+            RunAt = jobRequest.RunAt ?? DateTime.UtcNow,
         };
 
         await _dbContext.Jobs.AddAsync(job, ct);
