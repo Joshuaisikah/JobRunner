@@ -1,0 +1,23 @@
+[00:57:40] === Preconditions ===
+[00:57:42] === 1. Seeding 50,000 rows and ANALYZE ===
+--- claim plan:
+Limit  (cost=0.29..3.33 rows=10 width=22)
+  ->  LockRows  (cost=0.29..1502.10 rows=4925 width=22)
+        ->  Index Scan using "IX_jobs_claim" on jobs  (cost=0.29..1452.85 rows=4925 width=22)
+              Index Cond: ("RunAt" <= now())
+              Filter: (("Status")::text = 'Pending'::text)
+--- stale plan:
+Limit  (cost=0.29..9.11 rows=10 width=22)
+  ->  LockRows  (cost=0.29..1485.98 rows=1684 width=22)
+        ->  Index Scan using "IX_jobs_stale" on jobs  (cost=0.29..1469.14 rows=1684 width=22)
+              Index Cond: ("ClaimedAt" <= (now() - '00:00:30'::interval))
+              Filter: (("Attempts" < "MaxAttempts") AND (("Status")::text = 'Running'::text))
+[00:57:43] === 2. Assertions ===
+  PASS  claim: Index Scan using IX_jobs_claim                yes
+  PASS  claim: no Sort node                                  no
+  PASS  claim: no Seq Scan                                   no
+  PASS  stale: Index Scan using IX_jobs_stale                yes
+  PASS  stale: no Sort node                                  no
+  PASS  stale: no Seq Scan                                   no
+
+[00:57:43] RESULT: PASS  (both claim queries are served in index order)

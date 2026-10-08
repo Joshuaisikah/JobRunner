@@ -1,0 +1,3 @@
+[00:57:43] === Preconditions ===
+[00:57:44] === 1. Seed 20 jobs; start 2 workers ===
+[00:57:46] === 2. Database outage: 4s ===
