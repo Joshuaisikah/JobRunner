@@ -116,8 +116,17 @@ public class JobWorker : BackgroundService
                 _logger.LogError(ex, "Error occurred in worker main loop");
             }
 
-            if (!workFound && !stoppingToken.IsCancellationRequested)
-                await Task.Delay(PollInterval, stoppingToken);
+            if (!workFound)
+            {
+                try
+                {
+                    await Task.Delay(PollInterval, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
         }
 
         _logger.LogInformation("JobWorker stopped gracefully.");
@@ -125,7 +134,7 @@ public class JobWorker : BackgroundService
 
     private async Task ProcessJobAsync(ClaimedJob job, CancellationToken stoppingToken)
     {
-        var jobScope = _scopeFactory.CreateScope();
+        using var jobScope = _scopeFactory.CreateScope();
         var jobStore = jobScope.ServiceProvider.GetRequiredService<JobStore>();
         var handlers = jobScope.ServiceProvider.GetRequiredService<IEnumerable<IJobHandler>>();
         var handler = handlers.FirstOrDefault(h => h.JobType == job.JobType);
@@ -147,11 +156,25 @@ public class JobWorker : BackgroundService
             _logger.LogError("Job {JobId} is not in _heldJobs – aborting", job.Id);
             return;
         }
+        CancellationToken leaseToken;
+        try
+        {
+            leaseToken = held.Cts.Token;
+        }
+        catch (ObjectDisposedException)
+        {
+            _logger.LogWarning(
+                "Job {JobId} lease token was disposed before processing – skipping",
+                job.Id
+            );
+            return;
+        }
 
         using var jobTimeoutCts = new CancellationTokenSource(JobTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
             stoppingToken,
-            held.Cts.Token, // per-job lease token
+            held.Cts.Token,
+            leaseToken, // per-job lease token
             jobTimeoutCts.Token
         );
 
