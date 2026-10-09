@@ -1,0 +1,14 @@
+[18:58:41] === Preconditions ===
+[18:58:45] === 1. Seed one job with runAt = now + 60s ===
+[18:58:45] runAt = 2026-10-09T15:59:45Z
+[18:58:45] === 2. Start 3 workers (more chances to claim early) ===
+[18:59:35] t+10: Pending|0   t+50: Pending|0
+[18:59:35] === 3. Waiting for it to run after runAt ===
+[18:59:46] === 4. Assertions ===
+  PASS  t+10: still Pending, never claimed                   Pending|0
+  PASS  t+50: still Pending, never claimed                   Pending|0
+  PASS  eventually Succeeded                                 Succeeded
+  PASS  claimed no earlier than runAt                        true
+  PASS  executed exactly once                                1
+
+[18:59:47] RESULT: PASS  (not claimed before runAt, run once after it)

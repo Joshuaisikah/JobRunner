@@ -1,0 +1,11 @@
+[01:15:21] === Preconditions ===
+[01:15:23] === 1. Seed 20 jobs; start 2 workers ===
+[01:15:26] === 2. Database outage: 4s ===
+[01:15:30] Database back
+[01:15:30] === 3. Every job must be terminal within 80s ===
+[01:16:06] === 4. Assertions ===
+  PASS  jobs still Pending/Running                           0
+  PASS  jobs Succeeded                                       20
+        main-loop errors during outage: 10, heartbeat misses: 0, reclaims: 18
+
+[01:16:06] RESULT: PASS  (4s outage; watched 36s after the DB came back)

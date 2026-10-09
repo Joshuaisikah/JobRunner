@@ -1,0 +1,38 @@
+[01:12:55] === 0. Preconditions ===
+[01:12:55] StaleTimeout=30s ReclaimInterval=15s (from JobRunner.Worker/JobWorker.cs)
+[01:12:55] Building
+[01:12:56] Starting API
+[01:12:58] === 1. Seeding one job ===
+[01:12:58] === 2. Worker A: claim and start executing ===
+[01:12:59] === 3. kill -9 worker A (pid 180911) mid-execution ===
+[01:12:59] Job left in Running by dead worker A
+[01:12:59] === 4. Worker B: must reclaim after 30s, finish within 60s of A's claim ===
+[01:13:00] status: Running (0s since A's claim)
+[01:13:02] status: Running (3s since A's claim)
+[01:13:04] status: Running (5s since A's claim)
+[01:13:06] status: Running (7s since A's claim)
+[01:13:08] status: Running (9s since A's claim)
+[01:13:10] status: Running (11s since A's claim)
+[01:13:12] status: Running (13s since A's claim)
+[01:13:14] status: Running (15s since A's claim)
+[01:13:16] status: Running (17s since A's claim)
+[01:13:19] status: Running (20s since A's claim)
+[01:13:21] status: Running (22s since A's claim)
+[01:13:23] status: Running (24s since A's claim)
+[01:13:25] status: Running (26s since A's claim)
+[01:13:27] status: Running (28s since A's claim)
+[01:13:29] status: Running (30s since A's claim)
+[01:13:31] status: Running (32s since A's claim)
+[01:13:33] === 5. Assertions ===
+  PASS  status right after kill -9                       Running
+  PASS  worker A completed the job                       0
+  PASS  worker B reclaimed job 1                         1
+  PASS  worker B executed job 1                          1
+  PASS  final status                                     Succeeded
+  PASS  Attempts                                         2
+  PASS  FenceToken                                       2
+  PASS  reclaimed no earlier than StaleTimeout           yes
+  PASS  LockedBy cleared                                 <null>
+        reclaimed 31s after A's claim, succeeded 35s after A's claim
+
+[01:13:34] RESULT: PASS  (reclaimed after 31s, done after 35s; stale=30s)

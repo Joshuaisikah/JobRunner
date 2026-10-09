@@ -1,0 +1,16 @@
+[01:13:34] === Preconditions ===
+[01:13:37] === 1. Seed one job; worker A starts executing it ===
+[01:13:38] Worker A frozen mid-job (SIGSTOP)
+[01:13:38] === 2. Worker B must reclaim and complete job 1 ===
+[01:14:11] B completed job 1; row = Succeeded|2|2|
+[01:14:11] === 3. Wake worker A (SIGCONT) and let it try to finish ===
+[01:14:13] === 4. Assertions ===
+  PASS  row unchanged after A woke up                        Succeeded|2|2|
+  PASS  final status                                         Succeeded
+  PASS  FenceToken (B's claim)                               2
+  PASS  B completed job 1                                    1
+  PASS  A completed job 1                                    0
+  PASS  A noticed it lost job 1 (fence or lease)             yes
+        A's last words: Executing job 1 using handler ResizeImageJobHandler Lost fence token ownership for job 1 on complete 
+
+[01:14:13] RESULT: PASS  (hung worker's late write rejected; row kept B's result)

@@ -24,3 +24,38 @@
 [01:12:13] remaining: 113 (31s)
 [01:12:15] remaining: 107 (33s)
 [01:12:17] remaining: 101 (35s)
+[01:12:19] remaining: 95 (37s)
+[01:12:21] remaining: 89 (39s)
+[01:12:23] remaining: 83 (41s)
+[01:12:25] remaining: 77 (43s)
+[01:12:27] remaining: 71 (45s)
+[01:12:29] remaining: 65 (47s)
+[01:12:31] remaining: 56 (49s)
+[01:12:34] remaining: 50 (52s)
+[01:12:36] remaining: 44 (54s)
+[01:12:38] remaining: 38 (56s)
+[01:12:40] remaining: 32 (58s)
+[01:12:42] remaining: 26 (60s)
+[01:12:44] remaining: 20 (62s)
+[01:12:46] remaining: 16 (64s)
+[01:12:48] remaining: 12 (66s)
+[01:12:50] remaining: 8 (68s)
+[01:12:52] remaining: 4 (70s)
+[01:12:54] Queue drained in 72s
+[01:12:54] === 5. Stopping workers ===
+[01:12:54] === 6. Assertions ===
+  PASS  jobs in table                                  200
+  PASS  jobs Succeeded                                 200
+  PASS  jobs claimed more than once                    0
+  PASS  jobs with FenceToken <> 1                      0
+  PASS  handler executions (log lines)                 200
+  PASS  jobs executed more than once                   0
+  PASS  jobs never executed                            0
+  PASS  workers that executed nothing                  0
+        distribution: w1=60 w2=70 w3=70 
+  PASS  stale reclaims                                 0
+  PASS  lost fence tokens                              0
+  PASS  handler failures                               0
+  PASS  worker main-loop errors                        0
+
+[01:12:55] RESULT: PASS  (3 workers, 200 jobs, drained in 72s, w1=60 w2=70 w3=70 )
